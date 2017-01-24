@@ -9,7 +9,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.InetAddress;
-import java.net.Socket;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
 import java.util.List;
 
 public class Bot implements Runnable, Closeable{
@@ -17,6 +23,7 @@ public class Bot implements Runnable, Closeable{
     private static final Logger logger = LoggerFactory.getLogger(Bot.class);
 
     private static final int DEFAULT_PORT = 6667;
+    private static final int BUFFER_SIZE = 512;
 
     // Command responses
     private static final String RPL_WELCOME = "001";
@@ -30,10 +37,9 @@ public class Bot implements Runnable, Closeable{
 
     private List<String> joinedChannels = Lists.newArrayList();
 
-    // Closeables
-    private Socket socket;
-    private BufferedWriter writer;
-    private BufferedReader reader;
+    private SocketChannel socketChannel;
+    private Charset charset = Charset.forName("UTF-8");
+    private CharsetEncoder encoder = charset.newEncoder();
 
     public Bot(String server, String nick, String[] channels) {
         this(server, DEFAULT_PORT, nick, channels);
@@ -47,20 +53,26 @@ public class Bot implements Runnable, Closeable{
     }
 
     public void start() throws IOException {
-        socket = new Socket(server, port);
-        writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-        reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        SocketAddress remote = new InetSocketAddress(server, port);
+        socketChannel = SocketChannel.open();
+        socketChannel.connect(remote);
+        socketChannel.configureBlocking(false);
 
         Thread thread = new Thread(this);
         thread.start();
     }
 
     private void sendRaw(String line) {
+        if (line == null || line.length() == 0)
+            return;
+
         logger.debug(line);
 
         try {
-            writer.write(line + "\r\n");
-            writer.flush();
+            String message = line + "\r\n";
+            CharBuffer charBuffer = CharBuffer.wrap(message);
+            ByteBuffer byteBuffer = encoder.encode(charBuffer);
+            socketChannel.write(byteBuffer);
         } catch (IOException e) {
             logger.error(e.getMessage());
         }
@@ -184,6 +196,7 @@ public class Bot implements Runnable, Closeable{
             case "JOIN":
                 List<String> prefixes = tokenizePrefix(prefix);
                 if(prefixes.size() > 0 && prefixes.get(0).equals(nick)) {
+                    //sendRaw("PRIVMSG Nippon|zongzing :xdcc send #4740"); // TODO: DEBUG
                     List<String> params = tokenizeParams(lines.get(0));
                     if(params.size() > 0)
                         joinedChannels.add(params.get(0));
@@ -238,14 +251,36 @@ public class Bot implements Runnable, Closeable{
         }
     }
 
+    private static String readLine(ByteBuffer buffer) {
+        StringBuilder builder = new StringBuilder();
+        char previous = '\u0001';
+        char current;
+        while (buffer.hasRemaining()) {
+            current = (char) buffer.get();
+            builder.append(current);
+            if (previous == '\r' && current == '\n')
+                return builder.toString().substring(0, builder.length() - 2); // Returns a String not including any line-termination characters
+            previous = current;
+        }
+        return null;
+    }
+
     @Override
     public void run() {
         sendRaw("USER " + nick + " 8 * : bot");
         sendRaw("NICK " + nick);
 
         try {
-            String line;
-            while((line = reader.readLine()) != null) {
+            ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
+            while(socketChannel.isOpen()) {
+                int read = socketChannel.read(buffer);
+                if (read == -1)
+                    break; // End of stream
+                buffer.flip();
+                String line = readLine(buffer);
+                buffer.compact();
+                if (line == null)
+                    continue;
                 logger.debug(line);
                 handleLine(line);
             }
@@ -256,6 +291,6 @@ public class Bot implements Runnable, Closeable{
 
     @Override
     public void close() throws IOException {
-        socket.close();
+        socketChannel.close();
     }
 }

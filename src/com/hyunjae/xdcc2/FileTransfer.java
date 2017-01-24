@@ -54,12 +54,12 @@ public class FileTransfer implements Runnable, Closeable {
     @Override
     public void run() {
         try {
-            ByteBuffer inBuffer = ByteBuffer.allocate(BIG_BUFFER_SIZE);
+            ByteBuffer inBuffer = ByteBuffer.allocate(BIG_BUFFER_SIZE); // TODO: allocateDirect
             ByteBuffer outBuffer = ByteBuffer.allocate(4);
             outBuffer.order(ByteOrder.BIG_ENDIAN);
 
             int bytesRead;
-            int bytesTransferred = 0;
+            long bytesTransferred = 0;
 
             while((bytesRead = socketChannel.read(inBuffer)) != -1) {
                 inBuffer.flip();
@@ -68,7 +68,7 @@ public class FileTransfer implements Runnable, Closeable {
 
                 //Convert bytesTransfered to an "unsigned, 4 byte integer in network byte order", per DCC specification
                 bytesTransferred += bytesRead;
-                outBuffer.putInt(bytesTransferred); // TODO : Use unsigned-int
+                outBuffer.putInt((int) bytesTransferred); // TODO : Use unsigned-int
                 outBuffer.flip();
                 socketChannel.write(outBuffer);
                 outBuffer.clear();
