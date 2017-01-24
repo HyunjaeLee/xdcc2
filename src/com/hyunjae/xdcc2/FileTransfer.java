@@ -10,7 +10,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SocketChannel;
 
@@ -54,9 +53,8 @@ public class FileTransfer implements Runnable, Closeable {
     @Override
     public void run() {
         try {
-            ByteBuffer inBuffer = ByteBuffer.allocate(BIG_BUFFER_SIZE); // TODO: allocateDirect
+            ByteBuffer inBuffer = ByteBuffer.allocateDirect(BIG_BUFFER_SIZE); // TODO
             ByteBuffer outBuffer = ByteBuffer.allocate(4);
-            outBuffer.order(ByteOrder.BIG_ENDIAN);
 
             int bytesRead;
             long bytesTransferred = 0;
@@ -68,7 +66,10 @@ public class FileTransfer implements Runnable, Closeable {
 
                 //Convert bytesTransfered to an "unsigned, 4 byte integer in network byte order", per DCC specification
                 bytesTransferred += bytesRead;
-                outBuffer.putInt((int) bytesTransferred); // TODO : Use unsigned-int
+                outBuffer.put(0, (byte) ((bytesTransferred >> 24) & 0xff));
+                outBuffer.put(1, (byte) ((bytesTransferred >> 16) & 0xff));
+                outBuffer.put(2, (byte) ((bytesTransferred >> 8) & 0xff));
+                outBuffer.put(3, (byte) (bytesTransferred & 0xff));
                 outBuffer.flip();
                 socketChannel.write(outBuffer);
                 outBuffer.clear();

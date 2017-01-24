@@ -96,7 +96,7 @@ public class Bot implements Runnable, Closeable{
         if (Strings.isNullOrEmpty(rawLine))
             return strings;
 
-        String line = CharMatcher.WHITESPACE.trimFrom(rawLine);
+        String line = CharMatcher.whitespace().trimFrom(rawLine);
 
         int pos = 0;
         int end;
@@ -119,7 +119,7 @@ public class Bot implements Runnable, Closeable{
         if(Strings.isNullOrEmpty(rawPrefix))
             return args;
 
-        String prefix = CharMatcher.WHITESPACE.trimFrom(rawPrefix);
+        String prefix = CharMatcher.whitespace().trimFrom(rawPrefix);
 
         int pos = 0;
         int end;
@@ -143,7 +143,7 @@ public class Bot implements Runnable, Closeable{
         if (Strings.isNullOrEmpty(rawParam))
             return params;
 
-        String param = CharMatcher.WHITESPACE.trimFrom(rawParam);
+        String param = CharMatcher.whitespace().trimFrom(rawParam);
 
         int pos = 0;
         int end;
