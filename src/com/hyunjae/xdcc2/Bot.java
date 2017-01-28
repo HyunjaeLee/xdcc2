@@ -4,6 +4,10 @@ import com.google.common.base.CharMatcher;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.net.InetAddresses;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +67,7 @@ public class Bot implements Runnable, Closeable{
     }
 
     private void sendRaw(String line) {
-        if (line == null || line.length() == 0)
+        if (Strings.isNullOrEmpty(line))
             return;
 
         logger.debug(line);
@@ -91,10 +95,46 @@ public class Bot implements Runnable, Closeable{
         return joinedChannels.contains(channel);
     }
 
-    private static List<String> tokenizeLine(String rawLine) {
+    private static <E> E tryRemoveFirst(List<E> collection, E defaultValue) {
+        if (collection == null || collection.isEmpty())
+            return defaultValue;
+        else
+            return collection.remove(0);
+    }
+
+    private static <E> E tryGetFirst(List<E> collection, E defaultValue) {
+        if (collection == null || collection.isEmpty())
+            return defaultValue;
+        else
+            return collection.get(0);
+    }
+
+    private static int tryParseInt(String intString, int defaultValue) {
+        if(Strings.isNullOrEmpty(intString))
+            return defaultValue;
+
+        Integer integer = Ints.tryParse(intString);
+
+        if (integer == null)
+            return defaultValue;
+        else
+            return integer;
+    }
+
+    private static long tryParseLong(String longString, long defaultValue) {
+        if(Strings.isNullOrEmpty(longString))
+            return defaultValue;
+
+        Long aLong = Longs.tryParse(longString);
+
+        if (aLong == null)
+            return defaultValue;
+        else
+            return aLong;
+    }
+
+    private static List<String> tokenizeLine(@NotNull String rawLine) {
         List<String> strings = Lists.newArrayList();
-        if (Strings.isNullOrEmpty(rawLine))
-            return strings;
 
         String line = CharMatcher.whitespace().trimFrom(rawLine);
 
@@ -114,10 +154,8 @@ public class Bot implements Runnable, Closeable{
         return strings;
     }
 
-    private static List<String> tokenizePrefix(String rawPrefix) {
+    private static List<String> tokenizePrefix(@NotNull String rawPrefix) {
         List<String> args = Lists.newArrayList();
-        if(Strings.isNullOrEmpty(rawPrefix))
-            return args;
 
         String prefix = CharMatcher.whitespace().trimFrom(rawPrefix);
 
@@ -138,10 +176,8 @@ public class Bot implements Runnable, Closeable{
         return args;
     }
 
-    private static List<String> tokenizeParams(String rawParam) {
+    private static List<String> tokenizeParams(@NotNull String rawParam) {
         List<String> params = Lists.newArrayList();
-        if (Strings.isNullOrEmpty(rawParam))
-            return params;
 
         String param = CharMatcher.whitespace().trimFrom(rawParam);
 
@@ -161,14 +197,17 @@ public class Bot implements Runnable, Closeable{
     }
 
     private void handleLine(String line) {
+        if (Strings.isNullOrEmpty(line))
+            return;
+
         List<String> lines = tokenizeLine(line);
 
         String prefix = "";
         String command = "";
 
-        if(lines.size() > 0 && lines.get(0).charAt(0) == ':')
+        if(!lines.isEmpty() && lines.get(0).charAt(0) == ':')
             prefix = lines.remove(0);
-        if(lines.size() > 0)
+        if(!lines.isEmpty())
             command = lines.remove(0);
 
         switch(command) {
@@ -211,6 +250,9 @@ public class Bot implements Runnable, Closeable{
     }
 
     private void handleCTCP(String rawParam) {
+        if (Strings.isNullOrEmpty(rawParam))
+            return;
+
         String param;
         if (rawParam.charAt(0) == ':')
             param = rawParam.substring(1);
@@ -225,19 +267,10 @@ public class Bot implements Runnable, Closeable{
 
         if(params.size() > 0 && params.remove(0).equals("DCC")) {
             if(params.size() > 0 && params.remove(0).equals("SEND")) {
-                String filename = "";
-                InetAddress addr = null;
-                int port = -1;
-                long fileSize = -1;
-
-                if (params.size() > 0)
-                    filename = params.remove(0);
-                if (params.size() > 0)
-                    addr = InetAddresses.fromInteger(Integer.parseInt(params.remove(0)));
-                if (params.size() > 0)
-                    port = Integer.parseInt(params.remove(0));
-                if (params.size() > 0)
-                    fileSize = Long.parseLong(params.remove(0));
+                String filename = tryRemoveFirst(params, "");
+                InetAddress addr = InetAddresses.fromInteger(tryParseInt(tryRemoveFirst(params, ""), 0));
+                int port = tryParseInt(tryRemoveFirst(params, ""), -1);
+                long fileSize = tryParseLong(tryRemoveFirst(params, ""), -1);
 
                 logger.debug("filename: {}, ip: {}, port: {}, fileSize: {}", filename, addr, port, fileSize);
 
@@ -251,9 +284,10 @@ public class Bot implements Runnable, Closeable{
         }
     }
 
+    @Nullable
     private static String readLine(ByteBuffer buffer) {
         StringBuilder builder = new StringBuilder();
-        char previous = '\u0001';
+        char previous = 0;
         char current;
         while (buffer.hasRemaining()) {
             current = (char) buffer.get();

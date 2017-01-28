@@ -10,5 +10,14 @@
     <orderEntry type="library" name="org.slf4j:slf4j-api:1.7.22" level="project" />
     <orderEntry type="library" name="ch.qos.logback:logback-classic:1.1.9" level="project" />
     <orderEntry type="library" name="com.google.guava:guava:21.0" level="project" />
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$MODULE_DIR$/lib/annotations-java8.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
   </component>
 </module>
